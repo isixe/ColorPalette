@@ -1,1 +1,1 @@
-# Color-palette
+# ColorPalette
