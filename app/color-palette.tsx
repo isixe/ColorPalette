@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Slider } from "@/components/ui/slider"
 import { cn } from "@/lib/utils"
 import { toast } from "@/hooks/use-toast"
+import Color from "color"
 
 // We'll dynamically import color-thief to avoid SSR issues
 import dynamic from "next/dynamic"
@@ -27,7 +28,6 @@ export default function ColorPicker() {
   const [colorCount, setColorCount] = useState<number>(5)
   const [quality, setQuality] = useState<number>(10)
   const [copied, setCopied] = useState(false)
-  const [isPickingColor, setIsPickingColor] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const imageRef = useRef<HTMLImageElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -49,18 +49,6 @@ export default function ColorPicker() {
     // Generate initial random colors
     generateRandomColors()
   }, [])
-
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) {
-      const reader = new FileReader()
-      reader.onload = (event) => {
-        const result = event.target?.result as string
-        setImage(result)
-      }
-      reader.readAsDataURL(file)
-    }
-  }
 
   // Extract colors when image loads
   useEffect(() => {
@@ -95,6 +83,18 @@ export default function ColorPicker() {
     ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
   }
 
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      const reader = new FileReader()
+      reader.onload = (event) => {
+        const result = event.target?.result as string
+        setImage(result)
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+
   const extractColorsFromImage = async () => {
     if (!imageRef.current || !colorThiefRef.current) return
 
@@ -111,11 +111,8 @@ export default function ColorPicker() {
       // Get palette from ColorThief
       const palette = colorThiefRef.current.getPalette(imageRef.current, colorCount, quality)
 
-      // Convert RGB arrays to hex colors
-      const hexColors = palette.map(
-        (color: number[]) =>
-          `#${color[0].toString(16).padStart(2, "0")}${color[1].toString(16).padStart(2, "0")}${color[2].toString(16).padStart(2, "0")}`,
-      )
+      // Convert RGB arrays to hex colors using color library
+      const hexColors = palette.map((color: number[]) => Color.rgb(color[0], color[1], color[2]).hex())
 
       setColors(hexColors)
       if (hexColors.length > 0) {
@@ -142,33 +139,8 @@ export default function ColorPicker() {
       const saturation = 70 + Math.floor(Math.random() * 30)
       const lightness = 40 + Math.floor(Math.random() * 40)
 
-      // Convert HSL to RGB
-      const h = hue / 360
-      const s = saturation / 100
-      const l = lightness / 100
-
-      const hue2rgb = (p: number, q: number, t: number) => {
-        if (t < 0) t += 1
-        if (t > 1) t -= 1
-        if (t < 1 / 6) return p + (q - p) * 6 * t
-        if (t < 1 / 2) return q
-        if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6
-        return p
-      }
-
-      const q = l < 0.5 ? l * (1 + s) : l + s - l * s
-      const p = 2 * l - q
-
-      const r = hue2rgb(p, q, h + 1 / 3)
-      const g = hue2rgb(p, q, h)
-      const b = hue2rgb(p, q, h - 1 / 3)
-
-      const toHex = (x: number) => {
-        const hex = Math.round(x * 255).toString(16)
-        return hex.length === 1 ? "0" + hex : hex
-      }
-
-      const hexColor = `#${toHex(r)}${toHex(g)}${toHex(b)}`
+      // Convert HSL to hex using color library
+      const hexColor = Color.hsl(hue, saturation, lightness).hex()
       newColors.push(hexColor)
     }
 
@@ -209,17 +181,6 @@ export default function ColorPicker() {
     })
   }
 
-  const hexToRgb = (hex: string) => {
-    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
-    return result
-      ? {
-          r: Number.parseInt(result[1], 16),
-          g: Number.parseInt(result[2], 16),
-          b: Number.parseInt(result[3], 16),
-        }
-      : null
-  }
-
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!canvasRef.current) return
 
@@ -240,8 +201,8 @@ export default function ColorPicker() {
     const pixelData = ctx.getImageData(x, y, 1, 1).data
     const [r, g, b] = pixelData
 
-    // Convert to hex
-    const hexColor = `#${r.toString(16).padStart(2, "0")}${g.toString(16).padStart(2, "0")}${b.toString(16).padStart(2, "0")}`
+    // Convert to hex using color library
+    const hexColor = Color.rgb(r, g, b).hex()
 
     // For eyedropper mode, replace the colors array with just this color
     if (activeTab === "eyedropper") {
@@ -261,10 +222,6 @@ export default function ColorPicker() {
       title: "已选取颜色",
       description: hexColor.toUpperCase(),
     })
-  }
-
-  const toggleColorPicker = () => {
-    setIsPickingColor(!isPickingColor)
   }
 
   return (
@@ -403,7 +360,6 @@ export default function ColorPicker() {
                         onClick={handleCanvasClick}
                         className={cn(
                           "max-w-full cursor-crosshair border rounded-md",
-                          isPickingColor ? "border-primary" : "border-transparent",
                         )}
                       />
                       <img
@@ -424,17 +380,6 @@ export default function ColorPicker() {
                   </div>
                 )}
               </div>
-
-              {image && (
-                <Button
-                  onClick={toggleColorPicker}
-                  variant={isPickingColor ? "secondary" : "outline"}
-                  className="w-full"
-                >
-                  <Pipette className="mr-2 h-4 w-4" />
-                  {isPickingColor ? "取色中..." : "开始取色"}
-                </Button>
-              )}
 
               {image && selectedColor && activeTab === "eyedropper" && (
                 <div className="mt-4 flex items-center gap-4 p-4 border rounded-lg bg-muted/20">
@@ -518,66 +463,42 @@ export default function ColorPicker() {
                     </TabsContent>
                     <TabsContent value="rgb" className="p-4 bg-muted/50 rounded-md mt-2">
                       {(() => {
-                        const rgb = hexToRgb(selectedColor)
-                        const rgbString = rgb ? `rgb(${rgb.r}, ${rgb.g}, ${rgb.b})` : ""
-                        return rgb ? (
-                          <div className="flex justify-between items-center">
-                            <code>{rgbString}</code>
-                            <Button variant="ghost" size="sm" onClick={() => copyToClipboard(rgbString)}>
-                              <Copy className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        ) : null
+                        try {
+                          const colorObj = Color(selectedColor)
+                          const rgb = colorObj.rgb().object()
+                          const rgbString = `rgb(${Math.round(rgb.r)}, ${Math.round(rgb.g)}, ${Math.round(rgb.b)})`
+
+                          return (
+                            <div className="flex justify-between items-center">
+                              <code>{rgbString}</code>
+                              <Button variant="ghost" size="sm" onClick={() => copyToClipboard(rgbString)}>
+                                <Copy className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          )
+                        } catch (error) {
+                          return null
+                        }
                       })()}
                     </TabsContent>
                     <TabsContent value="hsl" className="p-4 bg-muted/50 rounded-md mt-2">
                       {(() => {
-                        const rgb = hexToRgb(selectedColor)
-                        if (!rgb) return null
+                        try {
+                          const colorObj = Color(selectedColor)
+                          const hsl = colorObj.hsl().object()
+                          const hslString = `hsl(${Math.round(hsl.h)}, ${Math.round(hsl.s)}%, ${Math.round(hsl.l)}%)`
 
-                        // Convert RGB to HSL
-                        const r = rgb.r / 255
-                        const g = rgb.g / 255
-                        const b = rgb.b / 255
-
-                        const max = Math.max(r, g, b)
-                        const min = Math.min(r, g, b)
-                        let h = 0,
-                          s = 0,
-                          l = (max + min) / 2
-
-                        if (max !== min) {
-                          const d = max - min
-                          s = l > 0.5 ? d / (2 - max - min) : d / (max + min)
-
-                          switch (max) {
-                            case r:
-                              h = (g - b) / d + (g < b ? 6 : 0)
-                              break
-                            case g:
-                              h = (b - r) / d + 2
-                              break
-                            case b:
-                              h = (r - g) / d + 4
-                              break
-                          }
-
-                          h = Math.round(h * 60)
+                          return (
+                            <div className="flex justify-between items-center">
+                              <code>{hslString}</code>
+                              <Button variant="ghost" size="sm" onClick={() => copyToClipboard(hslString)}>
+                                <Copy className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          )
+                        } catch (error) {
+                          return null
                         }
-
-                        s = Math.round(s * 100)
-                        l = Math.round(l * 100)
-
-                        const hslString = `hsl(${h}, ${s}%, ${l}%)`
-
-                        return (
-                          <div className="flex justify-between items-center">
-                            <code>{hslString}</code>
-                            <Button variant="ghost" size="sm" onClick={() => copyToClipboard(hslString)}>
-                              <Copy className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        )
                       })()}
                     </TabsContent>
                   </Tabs>
