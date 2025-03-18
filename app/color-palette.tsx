@@ -1,8 +1,9 @@
+/* eslint-disable @next/next/no-img-element */
 "use client"
 
 import type React from "react"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useCallback } from "react"
 import { Upload, Palette, RefreshCw, Copy, Check, Pipette } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -12,11 +13,7 @@ import { Slider } from "@/components/ui/slider"
 import { cn } from "@/lib/utils"
 import { toast } from "@/hooks/use-toast"
 import Color from "color"
-
-// We'll dynamically import color-thief to avoid SSR issues
-import dynamic from "next/dynamic"
-
-const ColorThief = dynamic(() => import("colorthief").then((mod) => mod.default), { ssr: false })
+import colorthief from "colorthief"
 
 type ColorMode = "random" | "image" | "eyedropper"
 
@@ -32,44 +29,8 @@ export default function ColorPicker() {
   const imageRef = useRef<HTMLImageElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const eyedropperImageRef = useRef<HTMLImageElement>(null)
-  const colorThiefRef = useRef<any>(null)
+  const colorThiefRef = useRef<colorthief>(null)
 
-  // Initialize ColorThief
-  useEffect(() => {
-    const initColorThief = async () => {
-      try {
-        colorThiefRef.current = new (await import("colorthief")).default()
-      } catch (error) {
-        console.error("Failed to load ColorThief:", error)
-      }
-    }
-
-    initColorThief()
-
-    // Generate initial random colors
-    generateRandomColors()
-  }, [])
-
-  // Extract colors when image loads
-  useEffect(() => {
-    if (image && imageRef.current && imageRef.current.complete && colorThiefRef.current) {
-      extractColorsFromImage()
-    }
-  }, [image, colorCount, quality])
-
-  // Set up canvas for eyedropper tab
-  useEffect(() => {
-    if (activeTab === "eyedropper" && image && eyedropperImageRef.current && canvasRef.current) {
-      const img = eyedropperImageRef.current
-      const canvas = canvasRef.current
-
-      if (img.complete) {
-        setupCanvas(img, canvas)
-      } else {
-        img.onload = () => setupCanvas(img, canvas)
-      }
-    }
-  }, [activeTab, image])
 
   const setupCanvas = (img: HTMLImageElement, canvas: HTMLCanvasElement) => {
     const ctx = canvas.getContext("2d")
@@ -95,7 +56,7 @@ export default function ColorPicker() {
     }
   }
 
-  const extractColorsFromImage = async () => {
+  const extractColorsFromImage = useCallback(   async () => {
     if (!imageRef.current || !colorThiefRef.current) return
 
     try {
@@ -126,7 +87,7 @@ export default function ColorPicker() {
         variant: "destructive",
       })
     }
-  }
+  },[colorCount, quality])
 
   const generateRandomColors = () => {
     // Generate random harmonious colors
@@ -224,11 +185,37 @@ export default function ColorPicker() {
     })
   }
 
+  // Extract colors when image loads
+  useEffect(() => {
+    colorThiefRef.current = new colorthief()
+    if (image && imageRef.current && imageRef.current.complete && colorThiefRef.current) {
+      extractColorsFromImage()
+    }
+  }, [image, colorCount, quality, extractColorsFromImage])
+
+  // Set up canvas for eyedropper tab
+  useEffect(() => {
+    if (activeTab === "eyedropper" && image && eyedropperImageRef.current && canvasRef.current) {
+      const img = eyedropperImageRef.current
+        const canvas = canvasRef.current
+
+        if (img.complete) {
+          setupCanvas(img, canvas)
+        } else {
+          img.onload = () => setupCanvas(img, canvas)
+        }
+      }
+    }, [activeTab, image])
+
+
   return (
     <div className="container mx-auto py-10 px-4">
       <h1 className="text-3xl font-bold mb-6 text-center">色卡生成工具</h1>
 
-      <Tabs defaultValue="random" className="mb-6" onValueChange={(value) => setActiveTab(value as ColorMode)}>
+      <Tabs defaultValue="random" className="mb-6" onValueChange={(value) => {
+        setColors([])
+        setActiveTab(value as ColorMode)
+    }}>
         <TabsList className="grid w-full max-w-md mx-auto grid-cols-3">
           <TabsTrigger value="random">随机生成</TabsTrigger>
           <TabsTrigger value="image">图片提取</TabsTrigger>
@@ -506,16 +493,17 @@ export default function ColorPicker() {
               )}
             </div>
           ) : (
-            <div className="flex flex-col items-center justify-center h-[200px] text-muted-foreground">
-              <Palette className="h-12 w-12 mb-2" />
-              <p>
-                {activeTab === "random"
-                  ? "点击生成随机色卡"
-                  : activeTab === "image"
-                    ? "上传图片以提取色卡"
-                    : "上传图片并点击任意位置选取颜色"}
-              </p>
-            </div>
+            <>
+              {activeTab === "random" &&(
+                <div  className="flex flex-col items-center justify-center h-[200px] text-muted-foreground" onClick={() => generateRandomColors()}><Palette className="h-12 w-12 mb-2" /><p>点击生成随机色卡</p></div>
+              )}
+              {activeTab === "image" &&(
+                <div  className="flex flex-col items-center justify-center h-[200px] text-muted-foreground"><Palette className="h-12 w-12 mb-2" /><p >上传图片以提取色卡</p></div>
+              )}
+              {activeTab !== "random" && activeTab !== "image" &&(
+                <div  className="flex flex-col items-center justify-center h-[200px] text-muted-foreground"><Palette className="h-12 w-12 mb-2" /><p >上传图片并点击任意位置选取颜色</p></div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>
