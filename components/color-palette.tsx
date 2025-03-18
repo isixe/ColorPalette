@@ -17,6 +17,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { toast } from '@/hooks/use-toast'
 import { clsxMerge } from '@/utils/clsx'
 import { randomColor } from '@/utils/colorGenerator'
+import { handleFileDrop, handleFileUpload } from '@/utils/fileUtils'
 import { extractColors } from '@/utils/imageColorExtractor'
 import Color from 'color'
 import colorthief from 'colorthief'
@@ -54,12 +55,27 @@ export default function ColorPicker() {
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
-      const reader = new FileReader()
-      reader.onload = (event) => {
-        const result = event.target?.result as string
-        setImage(result)
+      if (!file.type.startsWith('image/')) {
+        toast({
+          title: '无效的文件类型',
+          description: '请上传图片文件 (JPG, PNG, GIF 等)',
+          variant: 'destructive'
+        })
+        return
       }
-      reader.readAsDataURL(file)
+
+      handleFileUpload(
+        file,
+        (dataUrl) => setImage(dataUrl),
+        (error) => {
+          console.error('File upload error:', error)
+          toast({
+            title: '文件上传失败',
+            description: '请重试或选择其他文件',
+            variant: 'destructive'
+          })
+        }
+      )
     }
   }
 
@@ -95,26 +111,35 @@ export default function ColorPicker() {
     }
   }
 
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault()
-  }
+  const handleDragOver = (e: React.DragEvent) => e.preventDefault()
 
   const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault()
-    const file = e.dataTransfer.files[0]
-    if (file && file.type.startsWith('image/')) {
-      const reader = new FileReader()
-      reader.onload = (event) => {
-        const result = event.target?.result as string
-        setImage(result)
+    handleFileDrop(e, (file: File) => {
+      if (!file.type.startsWith('image/')) {
+        toast({
+          title: '无效的文件类型',
+          description: '请上传图片文件 (JPG, PNG, GIF 等)',
+          variant: 'destructive'
+        })
+        return
       }
-      reader.readAsDataURL(file)
-    }
+
+      handleFileUpload(
+        file,
+        (dataUrl) => setImage(dataUrl),
+        (error) => {
+          console.error('File drop error:', error)
+          toast({
+            title: '文件上传失败',
+            description: '请重试或选择其他文件',
+            variant: 'destructive'
+          })
+        }
+      )
+    })
   }
 
-  const triggerFileInput = () => {
-    fileInputRef.current?.click()
-  }
+  const triggerFileInput = () => fileInputRef.current?.click()
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text)
@@ -161,12 +186,6 @@ export default function ColorPicker() {
 
     // Select this color
     setSelectedColor(hexColor)
-
-    // Show feedback
-    toast({
-      title: '已选取颜色',
-      description: hexColor.toUpperCase()
-    })
   }
 
   // Extract colors when image loads
