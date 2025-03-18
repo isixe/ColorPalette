@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Slider } from "@/components/ui/slider"
-import { cn } from "@/lib/utils"
+import { clsxMerge } from "@/utils/clsx"
 import { toast } from "@/hooks/use-toast"
 import Color from "color"
 import colorthief from "colorthief"
@@ -258,7 +258,7 @@ export default function ColorPicker() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div
-                className={cn(
+                className={clsxMerge(
                   "border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center cursor-pointer hover:bg-muted/50 transition-colors",
                   image ? "border-primary" : "border-muted",
                 )}
@@ -329,7 +329,7 @@ export default function ColorPicker() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div
-                className={cn(
+                className={clsxMerge(
                   "border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center cursor-pointer hover:bg-muted/50 transition-colors",
                   image ? "border-primary" : "border-muted",
                 )}
@@ -345,7 +345,7 @@ export default function ColorPicker() {
                       <canvas
                         ref={canvasRef}
                         onClick={handleCanvasClick}
-                        className={cn(
+                        className={clsxMerge(
                           "max-w-full cursor-crosshair border rounded-md",
                         )}
                       />
@@ -409,7 +409,7 @@ export default function ColorPicker() {
                 {colors.map((color, index) => (
                   <div
                     key={index}
-                    className={cn(
+                    className={clsxMerge(
                       "aspect-square rounded-md cursor-pointer hover:scale-105 transition-transform border",
                       selectedColor === color ? "ring-2 ring-primary ring-offset-2" : "",
                     )}
