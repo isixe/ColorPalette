@@ -1,20 +1,20 @@
-import type { Metadata } from "next";
-import "@/styles/global.css";
+import '@/styles/global.css'
+import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-	title: "Color Palette",
-	description: "Color Palette Tools",
-};
+  title: 'Color Palette',
+  description: 'Color Palette Tools'
+}
 
 export default function RootLayout({
-	children,
+  children
 }: Readonly<{
-	children: React.ReactNode;
+  children: React.ReactNode
 }>) {
-	return (
-		<html lang="en">
-			<link rel="icon" href="/favicon.ico" sizes="any" />
-			<body>{children}</body>
-		</html>
-	);
+  return (
+    <html lang="en">
+      <link rel="icon" href="/favicon.ico" sizes="any" />
+      <body>{children}</body>
+    </html>
+  )
 }
