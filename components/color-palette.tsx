@@ -16,6 +16,8 @@ import { Slider } from '@/components/ui/slider'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { toast } from '@/hooks/use-toast'
 import { clsxMerge } from '@/utils/clsx'
+import { randomColor } from '@/utils/colorGenerator'
+import { extractColors } from '@/utils/imageColorExtractor'
 import Color from 'color'
 import colorthief from 'colorthief'
 import { Check, Copy, Palette, Pipette, RefreshCw, Upload } from 'lucide-react'
@@ -65,25 +67,10 @@ export default function ColorPicker() {
     if (!imageRef.current || !colorThiefRef.current) return
 
     try {
-      // Make sure the image is loaded
-      if (!imageRef.current.complete) {
-        await new Promise((resolve) => {
-          if (imageRef.current) {
-            imageRef.current.onload = resolve
-          }
-        })
-      }
-
-      // Get palette from ColorThief
-      const palette = colorThiefRef.current.getPalette(
+      const hexColors = await extractColors(
         imageRef.current,
         colorCount,
         quality
-      )
-
-      // Convert RGB arrays to hex colors using color library
-      const hexColors = palette.map((color: number[]) =>
-        Color.rgb(color[0], color[1], color[2]).hex()
       )
 
       setColors(hexColors)
@@ -101,21 +88,7 @@ export default function ColorPicker() {
   }, [colorCount, quality])
 
   const generateRandomColors = () => {
-    // Generate random harmonious colors
-    const baseHue = Math.floor(Math.random() * 360)
-    const newColors = []
-
-    // Generate analogous colors
-    for (let i = 0; i < colorCount; i++) {
-      const hue = (baseHue + i * 30) % 360
-      const saturation = 70 + Math.floor(Math.random() * 30)
-      const lightness = 40 + Math.floor(Math.random() * 40)
-
-      // Convert HSL to hex using color library
-      const hexColor = Color.hsl(hue, saturation, lightness).hex()
-      newColors.push(hexColor)
-    }
-
+    const newColors = randomColor(colorCount)
     setColors(newColors)
     if (newColors.length > 0) {
       setSelectedColor(newColors[0])
