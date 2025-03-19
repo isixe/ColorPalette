@@ -1,6 +1,6 @@
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
-import { GithubIcon } from './icons/github-icon'
+import { GithubIcon } from '../icons/github-icon'
 
 export default function Header() {
   return (
