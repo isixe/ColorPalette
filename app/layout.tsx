@@ -1,3 +1,5 @@
+import Footer from '@/components/footer'
+import Header from '@/components/header'
 import { Toaster } from '@/components/ui/toaster'
 import '@/styles/global.css'
 import type { Metadata } from 'next'
@@ -16,7 +18,9 @@ export default function RootLayout({
     <html lang="zh-CN">
       <link rel="icon" href="/favicon.ico" sizes="any" />
       <body>
+        <Header />
         {children}
+        <Footer />
         <Toaster />
       </body>
     </html>
