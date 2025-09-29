@@ -83,6 +83,13 @@ export default function ColorPalette() {
     setSelected(arr[0] || null)
   }, [colorCount])
 
+  // 页面挂载后自动生成色卡
+  useEffect(() => {
+    if (mode === 'random' && colors.length === 0) {
+      handleRandom()
+    }
+  }, [mode, colorCount])
+
   // 文件上传
   const handleFileChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
