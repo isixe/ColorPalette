@@ -1,8 +1,6 @@
 /* eslint-disable @next/next/no-img-element */
 'use client'
 
-import type React from 'react'
-
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -22,222 +20,400 @@ import { extractColors } from '@/utils/imageColorExtractor'
 import Color from 'color'
 import colorthief from 'colorthief'
 import { Check, Copy, Palette, Pipette, RefreshCw, Upload } from 'lucide-react'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 
 type ColorMode = 'random' | 'image' | 'eyedropper'
 
-export default function ColorPicker() {
-  const [activeTab, setActiveTab] = useState<ColorMode>('random')
+// 工具函数：复制到剪贴板
+function useClipboard() {
+  const [copied, setCopied] = useState(false)
+  const copy = useCallback((text: string) => {
+    navigator.clipboard.writeText(text)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+    toast({ title: '已复制到剪贴板', description: text })
+  }, [])
+  return { copied, copy }
+}
+
+// 工具函数：canvas 绘制图片
+function drawImageToCanvas(img: HTMLImageElement, canvas: HTMLCanvasElement) {
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return
+  canvas.width = img.naturalWidth
+  canvas.height = img.naturalHeight
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+}
+
+// 取色器点击事件
+function getColorFromCanvas(
+  e: React.MouseEvent<HTMLCanvasElement>,
+  canvas: HTMLCanvasElement
+): string | null {
+  const rect = canvas.getBoundingClientRect()
+  const scaleX = canvas.width / rect.width
+  const scaleY = canvas.height / rect.height
+  const x = (e.clientX - rect.left) * scaleX
+  const y = (e.clientY - rect.top) * scaleY
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return null
+  const pixel = ctx.getImageData(x, y, 1, 1).data
+  return Color.rgb(pixel[0], pixel[1], pixel[2]).hex()
+}
+
+// 主组件
+export default function ColorPalette() {
+  const [mode, setMode] = useState<ColorMode>('random')
   const [image, setImage] = useState<string | null>(null)
   const [colors, setColors] = useState<string[]>([])
-  const [selectedColor, setSelectedColor] = useState<string | null>(null)
-  const [colorCount, setColorCount] = useState<number>(5)
-  const [quality, setQuality] = useState<number>(10)
-  const [copied, setCopied] = useState(false)
+  const [selected, setSelected] = useState<string | null>(null)
+  const [colorCount, setColorCount] = useState(5)
+  const [quality, setQuality] = useState(10)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const imageRef = useRef<HTMLImageElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const eyedropperImageRef = useRef<HTMLImageElement>(null)
+  const eyedropperImgRef = useRef<HTMLImageElement>(null)
   const colorThiefRef = useRef<colorthief>(null)
+  const { copied, copy } = useClipboard()
 
-  const setupCanvas = (img: HTMLImageElement, canvas: HTMLCanvasElement) => {
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return
+  // 随机色卡生成
+  const handleRandom = useCallback(() => {
+    const arr = randomColor(colorCount)
+    setColors(arr)
+    setSelected(arr[0] || null)
+  }, [colorCount])
 
-    // Set canvas dimensions to match image
-    canvas.width = img.naturalWidth
-    canvas.height = img.naturalHeight
-
-    // Draw image onto canvas
-    ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
-  }
-
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) {
+  // 文件上传
+  const handleFileChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0]
+      if (!file) return
       if (!file.type.startsWith('image/')) {
         toast({
           title: '无效的文件类型',
-          description: '请上传图片文件 (JPG, PNG, GIF 等)',
+          description: '请上传图片文件',
           variant: 'destructive'
         })
         return
       }
-
       handleFileUpload(
         file,
-        (dataUrl) => setImage(dataUrl),
-        (error) => {
-          console.error('File upload error:', error)
+        (url) => setImage(url),
+        () =>
           toast({
             title: '文件上传失败',
-            description: '请重试或选择其他文件',
+            description: '请重试',
             variant: 'destructive'
           })
-        }
       )
-    }
-  }
+    },
+    []
+  )
 
-  const extractColorsFromImage = useCallback(async () => {
-    if (!imageRef.current || !colorThiefRef.current) return
-
-    try {
-      const hexColors = await extractColors(
-        imageRef.current,
-        colorCount,
-        quality
-      )
-
-      setColors(hexColors)
-      if (hexColors.length > 0) {
-        setSelectedColor(hexColors[0])
+  // 拖拽上传
+  const handleDropImage = useCallback((e: React.DragEvent) => {
+    handleFileDrop(e, (file: File) => {
+      if (!file.type.startsWith('image/')) {
+        toast({
+          title: '无效的文件类型',
+          description: '请上传图片文件',
+          variant: 'destructive'
+        })
+        return
       }
-    } catch (error) {
-      console.error('Error extracting colors:', error)
+      handleFileUpload(
+        file,
+        (url) => setImage(url),
+        () =>
+          toast({
+            title: '文件上传失败',
+            description: '请重试',
+            variant: 'destructive'
+          })
+      )
+    })
+  }, [])
+
+  // 提取图片色卡
+  const handleExtractColors = useCallback(async () => {
+    if (!imageRef.current || !colorThiefRef.current) return
+    try {
+      const arr = await extractColors(imageRef.current, colorCount, quality)
+      setColors(arr)
+      setSelected(arr[0] || null)
+    } catch {
       toast({
         title: '提取颜色失败',
-        description: '请尝试上传不同的图片或调整参数',
+        description: '请尝试其他图片或参数',
         variant: 'destructive'
       })
     }
   }, [colorCount, quality])
 
-  const generateRandomColors = () => {
-    const newColors = randomColor(colorCount)
-    setColors(newColors)
-    if (newColors.length > 0) {
-      setSelectedColor(newColors[0])
-    }
-  }
-
-  const handleDragOver = (e: React.DragEvent) => e.preventDefault()
-
-  const handleDrop = (e: React.DragEvent) => {
-    handleFileDrop(e, (file: File) => {
-      if (!file.type.startsWith('image/')) {
-        toast({
-          title: '无效的文件类型',
-          description: '请上传图片文件 (JPG, PNG, GIF 等)',
-          variant: 'destructive'
-        })
-        return
+  // canvas 取色
+  const handleCanvasClick = useCallback(
+    (e: React.MouseEvent<HTMLCanvasElement>) => {
+      if (!canvasRef.current) return
+      const hex = getColorFromCanvas(e, canvasRef.current)
+      if (!hex) return
+      if (mode === 'eyedropper') {
+        setColors([hex])
+      } else if (!colors.includes(hex)) {
+        setColors([hex, ...colors.slice(0, 9)])
       }
+      setSelected(hex)
+    },
+    [mode, colors]
+  )
 
-      handleFileUpload(
-        file,
-        (dataUrl) => setImage(dataUrl),
-        (error) => {
-          console.error('File drop error:', error)
-          toast({
-            title: '文件上传失败',
-            description: '请重试或选择其他文件',
-            variant: 'destructive'
-          })
-        }
-      )
-    })
-  }
+  // 切换 tab 清空色卡
+  const handleTabChange = useCallback((v: string) => {
+    setColors([])
+    setMode(v as ColorMode)
+  }, [])
 
-  const triggerFileInput = () => fileInputRef.current?.click()
-
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-    toast({
-      title: '已复制到剪贴板',
-      description: text
-    })
-  }
-
-  const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!canvasRef.current) return
-
-    const canvas = canvasRef.current
-    const rect = canvas.getBoundingClientRect()
-
-    // Calculate mouse position on canvas
-    const scaleX = canvas.width / rect.width
-    const scaleY = canvas.height / rect.height
-
-    const x = (e.clientX - rect.left) * scaleX
-    const y = (e.clientY - rect.top) * scaleY
-
-    // Get pixel data at clicked location
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return
-
-    const pixelData = ctx.getImageData(x, y, 1, 1).data
-    const [r, g, b] = pixelData
-
-    // Convert to hex using color library
-    const hexColor = Color.rgb(r, g, b).hex()
-
-    // For eyedropper mode, replace the colors array with just this color
-    if (activeTab === 'eyedropper') {
-      setColors([hexColor])
-    } else {
-      // For other modes, add to colors array if not already there
-      if (!colors.includes(hexColor)) {
-        setColors((prev) => [hexColor, ...prev.slice(0, 9)])
-      }
-    }
-
-    // Select this color
-    setSelectedColor(hexColor)
-  }
-
-  // Extract colors when image loads
+  // 图片色卡提取副作用
   useEffect(() => {
     colorThiefRef.current = new colorthief()
-    if (
-      image &&
-      imageRef.current &&
-      imageRef.current.complete &&
-      colorThiefRef.current
-    ) {
-      extractColorsFromImage()
+    if (image && imageRef.current && imageRef.current.complete) {
+      handleExtractColors()
     }
-  }, [image, colorCount, quality, extractColorsFromImage])
+  }, [image, colorCount, quality, handleExtractColors])
 
-  // Set up canvas for eyedropper tab
+  // eyedropper canvas setup
   useEffect(() => {
     if (
-      activeTab === 'eyedropper' &&
+      mode === 'eyedropper' &&
       image &&
-      eyedropperImageRef.current &&
+      eyedropperImgRef.current &&
       canvasRef.current
     ) {
-      const img = eyedropperImageRef.current
+      const img = eyedropperImgRef.current
       const canvas = canvasRef.current
-
       if (img.complete) {
-        setupCanvas(img, canvas)
+        drawImageToCanvas(img, canvas)
       } else {
-        img.onload = () => setupCanvas(img, canvas)
+        img.onload = () => drawImageToCanvas(img, canvas)
       }
     }
-  }, [activeTab, image])
+  }, [mode, image])
 
+  // 滑块组件
+  interface ColorSliderProps {
+    value: number
+    min: number
+    max: number
+    onChange: (v: number) => void
+    label: string
+  }
+  const ColorSlider: React.FC<ColorSliderProps> = ({
+    value,
+    min,
+    max,
+    onChange,
+    label
+  }) => (
+    <div className="flex items-center justify-between">
+      <span className="text-sm font-medium">
+        {label}: {value}
+      </span>
+      <div className="w-2/3">
+        <Slider
+          value={[value]}
+          min={min}
+          max={max}
+          step={1}
+          onValueChange={(v) => onChange(v[0])}
+        />
+      </div>
+    </div>
+  )
+
+  // 色卡展示组件
+  interface ColorCardProps {
+    colors: string[]
+    selected: string | null
+    setSelected: (c: string) => void
+    mode: ColorMode
+  }
+  const ColorCard: React.FC<ColorCardProps> = ({
+    colors,
+    selected,
+    setSelected,
+    mode
+  }) => {
+    if (!colors.length) {
+      return (
+        <div className="flex h-[200px] flex-col items-center justify-center rounded-xl bg-gradient-to-br from-muted/40 to-white text-muted-foreground shadow-inner">
+          <Palette className="mb-2 h-12 w-12" />
+          <p className="text-base font-medium">
+            {mode === 'random'
+              ? '点击生成随机色卡'
+              : mode === 'image'
+                ? '上传图片以提取色卡'
+                : '上传图片并点击任意位置选取颜色'}
+          </p>
+        </div>
+      )
+    }
+    return (
+      <div className="space-y-8">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-5">
+          {colors.map((c, i) => (
+            <div
+              key={i}
+              className={cn(
+                'aspect-square cursor-pointer rounded-xl transition-all duration-200',
+                selected === c
+                  ? 'shadow-[0_14px_28px_rgba(0,0,0,0.25),0_10px_10px_rgba(0,0,0,0.22)]'
+                  : 'shadow-md hover:shadow-xl'
+              )}
+              style={{ backgroundColor: c }}
+              onClick={() => setSelected(c)}
+            >
+              <span className="sr-only">{c}</span>
+            </div>
+          ))}
+        </div>
+        {selected && <ColorDetail color={selected} />}
+      </div>
+    )
+  }
+
+  // 颜色详情组件
+  interface ColorDetailProps {
+    color: string
+  }
+  const ColorDetail: React.FC<ColorDetailProps> = ({ color }) => {
+    const { copied, copy } = useClipboard()
+    let rgb = '',
+      hsl = ''
+    try {
+      const c = Color(color)
+      const r = c.rgb().object(),
+        h = c.hsl().object()
+      rgb = `rgb(${Math.round(r.r)}, ${Math.round(r.g)}, ${Math.round(r.b)})`
+      hsl = `hsl(${Math.round(h.h)}, ${Math.round(h.s)}%, ${Math.round(h.l)}%)`
+    } catch {}
+    return (
+      <div className="space-y-4">
+        <Separator />
+        <Card className="border-2 border-primary/30 bg-white/80 shadow-lg">
+          <CardContent className="flex flex-col gap-4 py-6">
+            <div className="flex items-center gap-4">
+              <div
+                className="h-12 w-12 rounded-lg border shadow"
+                style={{ backgroundColor: color }}
+              />
+              <span className="text-lg font-bold tracking-wide text-primary">
+                {color.toUpperCase()}
+              </span>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => copy(color.toUpperCase())}
+                className="ml-auto"
+              >
+                {copied ? (
+                  <Check className="mr-2 h-4 w-4" />
+                ) : (
+                  <Copy className="mr-2 h-4 w-4" />
+                )}
+                复制
+              </Button>
+            </div>
+            <Tabs defaultValue="hex">
+              <TabsList className="mb-2 grid w-full grid-cols-3">
+                <TabsTrigger
+                  value="hex"
+                  className="rounded-[50px] transition-all duration-200 data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-lg"
+                >
+                  HEX
+                </TabsTrigger>
+                <TabsTrigger
+                  value="rgb"
+                  className="rounded-[50px] transition-all duration-200 data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-lg"
+                >
+                  RGB
+                </TabsTrigger>
+                <TabsTrigger
+                  value="hsl"
+                  className="rounded-[50px] transition-all duration-200 data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-lg"
+                >
+                  HSL
+                </TabsTrigger>
+              </TabsList>
+              <TabsContent value="hex" className="rounded-md bg-muted/30 p-4">
+                <div className="flex items-center justify-between">
+                  <code className="font-mono text-base text-primary">
+                    {color.toUpperCase()}
+                  </code>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => copy(color.toUpperCase())}
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </div>
+              </TabsContent>
+              <TabsContent value="rgb" className="rounded-md bg-muted/30 p-4">
+                <div className="flex items-center justify-between">
+                  <code className="font-mono text-base text-primary">
+                    {rgb}
+                  </code>
+                  <Button variant="ghost" size="sm" onClick={() => copy(rgb)}>
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </div>
+              </TabsContent>
+              <TabsContent value="hsl" className="rounded-md bg-muted/30 p-4">
+                <div className="flex items-center justify-between">
+                  <code className="font-mono text-base text-primary">
+                    {hsl}
+                  </code>
+                  <Button variant="ghost" size="sm" onClick={() => copy(hsl)}>
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </div>
+              </TabsContent>
+            </Tabs>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  // 主渲染
   return (
-    <div className="container mx-auto px-4 py-10">
+    <div className="container mx-auto max-w-screen-lg px-4 py-10">
       <h1 className="mb-6 text-center text-3xl font-bold">色卡生成工具</h1>
-
       <Tabs
         defaultValue="random"
         className="mb-6"
-        onValueChange={(value) => {
-          setColors([])
-          setActiveTab(value as ColorMode)
-        }}
+        onValueChange={handleTabChange}
       >
-        <TabsList className="mx-auto grid w-full max-w-md grid-cols-3">
-          <TabsTrigger value="random">随机生成</TabsTrigger>
-          <TabsTrigger value="image">图片提取</TabsTrigger>
-          <TabsTrigger value="eyedropper">取色器</TabsTrigger>
+        <TabsList className="mx-auto grid w-full max-w-md grid-cols-3 rounded-[50px] p-1 shadow">
+          <TabsTrigger
+            value="random"
+            className="rounded-[50px] transition-all duration-200 data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-lg"
+          >
+            随机生成
+          </TabsTrigger>
+          <TabsTrigger
+            value="image"
+            className="rounded-[50px] transition-all duration-200 data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-lg"
+          >
+            图片提取
+          </TabsTrigger>
+          <TabsTrigger
+            value="eyedropper"
+            className="rounded-[50px] transition-all duration-200 data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-lg"
+          >
+            取色器
+          </TabsTrigger>
         </TabsList>
-
+        {/* 随机色卡 */}
         <TabsContent value="random" className="mt-6">
           <Card>
             <CardHeader>
@@ -245,29 +421,21 @@ export default function ColorPicker() {
               <CardDescription>生成随机和谐的色卡</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">
-                  颜色数量: {colorCount}
-                </span>
-                <div className="w-2/3">
-                  <Slider
-                    value={[colorCount]}
-                    min={3}
-                    max={10}
-                    step={1}
-                    onValueChange={(value) => setColorCount(value[0])}
-                  />
-                </div>
-              </div>
-
-              <Button onClick={generateRandomColors} className="w-full">
+              <ColorSlider
+                value={colorCount}
+                min={3}
+                max={10}
+                onChange={setColorCount}
+                label="颜色数量"
+              />
+              <Button onClick={handleRandom} className="w-full">
                 <RefreshCw className="mr-2 h-4 w-4" />
                 重新生成色卡
               </Button>
             </CardContent>
           </Card>
         </TabsContent>
-
+        {/* 图片色卡提取 */}
         <TabsContent value="image" className="mt-6">
           <Card>
             <CardHeader>
@@ -280,9 +448,9 @@ export default function ColorPicker() {
                   'flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed p-6 transition-colors hover:bg-muted/50',
                   image ? 'border-primary' : 'border-muted'
                 )}
-                onDragOver={handleDragOver}
-                onDrop={handleDrop}
-                onClick={triggerFileInput}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={handleDropImage}
+                onClick={() => fileInputRef.current?.click()}
               >
                 <input
                   type="file"
@@ -291,16 +459,15 @@ export default function ColorPicker() {
                   accept="image/*"
                   className="hidden"
                 />
-
                 {image ? (
                   <div className="w-full">
                     <img
                       ref={imageRef}
-                      src={image || '/placeholder.svg'}
+                      src={image}
                       alt="Uploaded"
                       className="mx-auto max-h-[200px] rounded-md object-contain"
                       crossOrigin="anonymous"
-                      onLoad={extractColorsFromImage}
+                      onLoad={handleExtractColors}
                     />
                   </div>
                 ) : (
@@ -315,44 +482,28 @@ export default function ColorPicker() {
                   </div>
                 )}
               </div>
-
               {image && (
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">
-                      颜色数量: {colorCount}
-                    </span>
-                    <div className="w-2/3">
-                      <Slider
-                        value={[colorCount]}
-                        min={3}
-                        max={10}
-                        step={1}
-                        onValueChange={(value) => setColorCount(value[0])}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">
-                      质量 (越低越精确): {quality}
-                    </span>
-                    <div className="w-2/3">
-                      <Slider
-                        value={[quality]}
-                        min={1}
-                        max={20}
-                        step={1}
-                        onValueChange={(value) => setQuality(value[0])}
-                      />
-                    </div>
-                  </div>
+                  <ColorSlider
+                    value={colorCount}
+                    min={3}
+                    max={10}
+                    onChange={setColorCount}
+                    label="颜色数量"
+                  />
+                  <ColorSlider
+                    value={quality}
+                    min={1}
+                    max={20}
+                    onChange={setQuality}
+                    label="质量 (越低越精确)"
+                  />
                 </div>
               )}
             </CardContent>
           </Card>
         </TabsContent>
-
+        {/* 取色器 */}
         <TabsContent value="eyedropper" className="mt-6">
           <Card>
             <CardHeader>
@@ -365,9 +516,11 @@ export default function ColorPicker() {
                   'flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed p-6 transition-colors hover:bg-muted/50',
                   image ? 'border-primary' : 'border-muted'
                 )}
-                onDragOver={handleDragOver}
-                onDrop={handleDrop}
-                onClick={!image ? triggerFileInput : undefined}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={handleDropImage}
+                onClick={
+                  !image ? () => fileInputRef.current?.click() : undefined
+                }
               >
                 <input
                   type="file"
@@ -376,7 +529,6 @@ export default function ColorPicker() {
                   accept="image/*"
                   className="hidden"
                 />
-
                 {image ? (
                   <div className="w-full text-center">
                     <div className="relative inline-block">
@@ -388,8 +540,8 @@ export default function ColorPicker() {
                         )}
                       />
                       <img
-                        ref={eyedropperImageRef}
-                        src={image || '/placeholder.svg'}
+                        ref={eyedropperImgRef}
+                        src={image}
                         alt="Color Picker"
                         className="hidden"
                         crossOrigin="anonymous"
@@ -411,24 +563,23 @@ export default function ColorPicker() {
                   </div>
                 )}
               </div>
-
-              {image && selectedColor && activeTab === 'eyedropper' && (
+              {image && selected && mode === 'eyedropper' && (
                 <div className="mt-4 flex items-center gap-4 rounded-lg border bg-muted/20 p-4">
                   <div
                     className="h-16 w-16 rounded-md border shadow-sm"
-                    style={{ backgroundColor: selectedColor }}
+                    style={{ backgroundColor: selected }}
                   />
                   <div>
                     <p className="font-medium">已选取颜色</p>
                     <p className="text-lg font-bold">
-                      {selectedColor.toUpperCase()}
+                      {selected.toUpperCase()}
                     </p>
                   </div>
                   <Button
                     variant="outline"
                     size="sm"
                     className="ml-auto"
-                    onClick={() => copyToClipboard(selectedColor.toUpperCase())}
+                    onClick={() => copy(selected.toUpperCase())}
                   >
                     {copied ? (
                       <Check className="mr-2 h-4 w-4" />
@@ -443,172 +594,24 @@ export default function ColorPicker() {
           </Card>
         </TabsContent>
       </Tabs>
-
       <Card className="mt-6">
         <CardHeader>
           <CardTitle>色卡</CardTitle>
           <CardDescription>
-            {activeTab === 'random'
+            {mode === 'random'
               ? '随机生成的色卡'
-              : activeTab === 'image'
+              : mode === 'image'
                 ? '从图片中提取的色卡'
                 : '从图片中选取的颜色'}
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {colors.length > 0 ? (
-            <div className="space-y-6">
-              <div className="grid grid-cols-5 gap-2">
-                {colors.map((color, index) => (
-                  <div
-                    key={index}
-                    className={cn(
-                      'aspect-square cursor-pointer rounded-md border transition-transform hover:scale-105',
-                      selectedColor === color
-                        ? 'ring-2 ring-primary ring-offset-2'
-                        : ''
-                    )}
-                    style={{ backgroundColor: color }}
-                    onClick={() => setSelectedColor(color)}
-                  />
-                ))}
-              </div>
-
-              {selectedColor && (
-                <div className="space-y-4">
-                  <Separator />
-
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div
-                        className="h-10 w-10 rounded-md border"
-                        style={{ backgroundColor: selectedColor }}
-                      />
-                      <span className="font-medium">
-                        {selectedColor.toUpperCase()}
-                      </span>
-                    </div>
-                    <Button
-                      size="sm"
-                      onClick={() =>
-                        copyToClipboard(selectedColor.toUpperCase())
-                      }
-                    >
-                      {copied ? (
-                        <Check className="mr-2 h-4 w-4" />
-                      ) : (
-                        <Copy className="mr-2 h-4 w-4" />
-                      )}
-                      复制
-                    </Button>
-                  </div>
-
-                  <Tabs defaultValue="hex">
-                    <TabsList className="grid w-full grid-cols-3">
-                      <TabsTrigger value="hex">HEX</TabsTrigger>
-                      <TabsTrigger value="rgb">RGB</TabsTrigger>
-                      <TabsTrigger value="hsl">HSL</TabsTrigger>
-                    </TabsList>
-                    <TabsContent
-                      value="hex"
-                      className="mt-2 rounded-md bg-muted/50 p-4"
-                    >
-                      <div className="flex items-center justify-between">
-                        <code>{selectedColor.toUpperCase()}</code>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() =>
-                            copyToClipboard(selectedColor.toUpperCase())
-                          }
-                        >
-                          <Copy className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TabsContent>
-                    <TabsContent
-                      value="rgb"
-                      className="mt-2 rounded-md bg-muted/50 p-4"
-                    >
-                      {(() => {
-                        try {
-                          const colorObj = Color(selectedColor)
-                          const rgb = colorObj.rgb().object()
-                          const rgbString = `rgb(${Math.round(rgb.r)}, ${Math.round(rgb.g)}, ${Math.round(rgb.b)})`
-
-                          return (
-                            <div className="flex items-center justify-between">
-                              <code>{rgbString}</code>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => copyToClipboard(rgbString)}
-                              >
-                                <Copy className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          )
-                        } catch (error) {
-                          return null
-                        }
-                      })()}
-                    </TabsContent>
-                    <TabsContent
-                      value="hsl"
-                      className="mt-2 rounded-md bg-muted/50 p-4"
-                    >
-                      {(() => {
-                        try {
-                          const colorObj = Color(selectedColor)
-                          const hsl = colorObj.hsl().object()
-                          const hslString = `hsl(${Math.round(hsl.h)}, ${Math.round(hsl.s)}%, ${Math.round(hsl.l)}%)`
-
-                          return (
-                            <div className="flex items-center justify-between">
-                              <code>{hslString}</code>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => copyToClipboard(hslString)}
-                              >
-                                <Copy className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          )
-                        } catch (error) {
-                          return null
-                        }
-                      })()}
-                    </TabsContent>
-                  </Tabs>
-                </div>
-              )}
-            </div>
-          ) : (
-            <>
-              {activeTab === 'random' && (
-                <div
-                  className="flex h-[200px] flex-col items-center justify-center text-muted-foreground"
-                  onClick={() => generateRandomColors()}
-                >
-                  <Palette className="mb-2 h-12 w-12" />
-                  <p>点击生成随机色卡</p>
-                </div>
-              )}
-              {activeTab === 'image' && (
-                <div className="flex h-[200px] flex-col items-center justify-center text-muted-foreground">
-                  <Palette className="mb-2 h-12 w-12" />
-                  <p>上传图片以提取色卡</p>
-                </div>
-              )}
-              {activeTab !== 'random' && activeTab !== 'image' && (
-                <div className="flex h-[200px] flex-col items-center justify-center text-muted-foreground">
-                  <Palette className="mb-2 h-12 w-12" />
-                  <p>上传图片并点击任意位置选取颜色</p>
-                </div>
-              )}
-            </>
-          )}
+          <ColorCard
+            colors={colors}
+            selected={selected}
+            setSelected={setSelected}
+            mode={mode}
+          />
         </CardContent>
       </Card>
     </div>
