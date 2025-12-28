@@ -24,7 +24,8 @@ export async function generateMetadata(): Promise<Metadata> {
         'ColorPalette is a tool designed to help developers and designers create, manage, and use color palettes efficiently.',
       url,
       siteName: 'Color Palette',
-      locale: 'en'
+      locale: 'en',
+      images: `${url}/preview.jpg`
     }
   }
 }
