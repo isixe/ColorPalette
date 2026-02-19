@@ -2,6 +2,7 @@ import Client from '@/components/layout/client'
 import '@/styles/global.css'
 import type { Metadata } from 'next'
 import { headers } from 'next/headers'
+import Script from 'next/script'
 
 export async function generateMetadata(): Promise<Metadata> {
   const headersList = await headers()
@@ -35,8 +36,21 @@ export default function RootLayout({
 }: {
   children: React.ReactNode
 }) {
+  const analyticsScript = process.env.ANALYTICS_SCRIPT ?? ''
+
   return (
     <html lang="zh-CN">
+      <head>
+        {analyticsScript && (
+          <Script
+            src={analyticsScript}
+            id="analytics"
+            data-website-id="color-palette"
+            defer
+          />
+        )}
+      </head>
+      <body className="flex min-h-screen flex-col antialiased"></body>
       <link rel="icon" href="/favicon.ico" sizes="any" />
       <body>
         <Client>{children}</Client>
