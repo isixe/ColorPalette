@@ -36,7 +36,7 @@ export default function RootLayout({
 }: {
   children: React.ReactNode
 }) {
-  const analyticsScript = process.env.ANALYTICS_SCRIPT ?? ''
+  const analyticsScript = process.env.NEXT_PUBLIC_ANALYTICS_SCRIPT || ''
 
   return (
     <html lang="zh-CN">
@@ -49,9 +49,8 @@ export default function RootLayout({
             defer
           />
         )}
+        <link rel="icon" href="/favicon.ico" sizes="any" />
       </head>
-      <body className="flex min-h-screen flex-col antialiased"></body>
-      <link rel="icon" href="/favicon.ico" sizes="any" />
       <body>
         <Client>{children}</Client>
       </body>
