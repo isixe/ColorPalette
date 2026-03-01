@@ -36,19 +36,19 @@ export default function RootLayout({
 }: {
   children: React.ReactNode
 }) {
-  const analyticsScript = process.env.ANALYTICS_SCRIPT ?? ''
+  const analyticsScript = process.env.ANALYTICS_SCRIPT || ''
 
   return (
     <html lang="zh-CN">
       <head>
-        {analyticsScript && (
+        {analyticsScript ? (
           <Script
             src={analyticsScript}
             id="analytics"
             data-website-id="color-palette"
             defer
           />
-        )}
+        ) : null}
         <link rel="icon" href="/favicon.ico" sizes="any" />
       </head>
       <body>
