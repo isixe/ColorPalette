@@ -17,7 +17,7 @@ export const LANGUAGES: { label: string; value: Language }[] = [
 export const TRANSLATIONS: Record<Language, Record<string, string>> = {
   zh: {
     title: '色卡生成工具',
-    random: '随机生成',
+    nearby: '邻近色',
     image: '图片提取',
     eyedropper: '取色器',
     palette: '色卡',
@@ -33,10 +33,10 @@ export const TRANSLATIONS: Record<Language, Record<string, string>> = {
     pleaseRetry: '请重试',
     extractFailed: '提取颜色失败',
     tryOtherImage: '请尝试其他图片或参数',
-    emptyRandom: '点击生成随机色卡',
+    emptyNearby: '点击生成邻近色卡',
     emptyImage: '上传图片以提取色卡',
     emptyEyedropper: '上传图片并点击任意位置选取颜色',
-    descRandom: '生成随机和谐的色卡',
+    descNearby: '基于选定颜色生成邻近色系',
     regenerate: '重新生成色卡',
     descImage: '上传或拖拽图片以提取色卡',
     descEyedropper: '从图片中直接选取颜色',
@@ -44,13 +44,16 @@ export const TRANSLATIONS: Record<Language, Record<string, string>> = {
     dragTip: '点击或拖拽图片到此处',
     formatTip: '支持 JPG, PNG, GIF 等格式',
     selectedColor: '已选取颜色',
-    descPaletteRandom: '随机生成的色卡',
+    descPaletteNearby: '基于基础色生成的邻近色卡',
     descPaletteImage: '从图片中提取的色卡',
-    descPaletteEyedropper: '从图片中选取的颜色'
+    descPaletteEyedropper: '从图片中选取的颜色',
+    generate: '生成',
+    baseColor: '基础色',
+    colors: '种颜色'
   },
   en: {
     title: 'Color Palette Generator',
-    random: 'Random',
+    nearby: 'Nearby',
     image: 'Image Extract',
     eyedropper: 'Eyedropper',
     palette: 'Palette',
@@ -66,10 +69,10 @@ export const TRANSLATIONS: Record<Language, Record<string, string>> = {
     pleaseRetry: 'Please retry',
     extractFailed: 'Color extraction failed',
     tryOtherImage: 'Please try another image or parameter',
-    emptyRandom: 'Click to generate random palette',
+    emptyNearby: 'Click to generate nearby colors',
     emptyImage: 'Upload image to extract palette',
     emptyEyedropper: 'Upload image and click anywhere to pick color',
-    descRandom: 'Generate harmonious random palette',
+    descNearby: 'Generate colors near the base color',
     regenerate: 'Regenerate',
     descImage: 'Upload or drag image to extract palette',
     descEyedropper: 'Pick color directly from image',
@@ -77,9 +80,12 @@ export const TRANSLATIONS: Record<Language, Record<string, string>> = {
     dragTip: 'Click or drag image here',
     formatTip: 'Supports JPG, PNG, GIF',
     selectedColor: 'Selected Color',
-    descPaletteRandom: 'Randomly generated palette',
+    descPaletteNearby: 'Nearby colors from base color',
     descPaletteImage: 'Palette extracted from image',
-    descPaletteEyedropper: 'Color picked from image'
+    descPaletteEyedropper: 'Color picked from image',
+    generate: 'Generate',
+    baseColor: 'Base Color',
+    colors: 'colors'
   }
 }
 
