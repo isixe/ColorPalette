@@ -296,10 +296,10 @@ export default function Page() {
             </p>
           </div>
           {copied ? (
-            <Check className="h-5 w-5" />
+            <Check className="h-4 w-4" />
           ) : (
             <Copy
-              className="h-5 w-5"
+              className="h-4 w-4"
               onClick={() => copy(color.toUpperCase())}
             />
           )}
