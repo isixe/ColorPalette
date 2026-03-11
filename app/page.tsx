@@ -295,22 +295,17 @@ export default function Page() {
               {color.toUpperCase()}
             </p>
           </div>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => copy(color.toUpperCase())}
-            className="gap-1.5"
-          >
-            {copied ? (
-              <Check className="h-3.5 w-3.5" />
-            ) : (
-              <Copy className="h-3.5 w-3.5" />
-            )}
-            {getTranslation('copy')}
-          </Button>
+          {copied ? (
+            <Check className="h-5 w-5" />
+          ) : (
+            <Copy
+              className="h-5 w-5"
+              onClick={() => copy(color.toUpperCase())}
+            />
+          )}
         </div>
         <Separator className="my-3" />
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
           {formats.map((format) => (
             <button
               key={format.label}
