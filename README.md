@@ -12,13 +12,11 @@
 
 </div>
 
----
-
-## English
-
-### Introduction
+<div align="center">
 
 ColorPalette is a modern color palette tool designed to help developers and designers create, manage, and use color palettes efficiently.
+
+</div>
 
 ### Features
 
